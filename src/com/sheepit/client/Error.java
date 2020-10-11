@@ -2,7 +2,7 @@
  * Copyright (C) 2013-2014 Laurent CLOUET
  * Author Laurent CLOUET <laurent.clouet@nopnop.net>
  *
- * This program is free software; you can redistribute it and/or 
+ * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; version 2
  * of the License.
@@ -32,6 +32,7 @@ public class Error {
 		MISSING_RENDERER(6),
 		MISSING_SCENE(7),
 		NOOUTPUTFILE(8),
+		IMAGE_TOO_LARGE(26),
 		DOWNLOAD_FILE(9),
 		CAN_NOT_CREATE_DIRECTORY(10),
 		NETWORK_ISSUE(11),
@@ -51,8 +52,7 @@ public class Error {
 		VALIDATION_FAILED(25),
 		
 		// internal error handling
-		NO_SPACE_LEFT_ON_DEVICE(100),
-		ERROR_BAD_RESPONSE(101),
+		NO_SPACE_LEFT_ON_DEVICE(100), ERROR_BAD_RESPONSE(101),
 		;
 		
 		private final int id;
@@ -90,13 +90,13 @@ public class Error {
 		JOB_VALIDATION_ERROR_FRAME_IS_NOT_IMAGE(302),
 		JOB_VALIDATION_ERROR_UPLOAD_FAILED(303),
 		JOB_VALIDATION_ERROR_SESSION_DISABLED(304), // missing heartbeat or broken machine
+		JOB_VALIDATION_IMAGE_TOO_LARGE(306),
+		JOB_VALIDATION_ERROR_IMAGE_WRONG_DIMENSION(308),
 		
 		KEEPMEALIVE_STOP_RENDERING(400),
 		
 		// internal error handling
-		ERROR_NO_ROOT(2),
-		ERROR_BAD_RESPONSE(3),
-		ERROR_REQUEST_FAILED(5);
+		ERROR_NO_ROOT(2), ERROR_BAD_RESPONSE(3), ERROR_REQUEST_FAILED(5);
 		
 		private final int id;
 		
@@ -129,15 +129,15 @@ public class Error {
 				return Type.TOO_OLD_CLIENT;
 			case CONFIGURATION_ERROR_AUTH_FAILED:
 				return Type.AUTHENTICATION_FAILED;
-				
+			
 			case CONFIGURATION_ERROR_NO_CLIENT_VERSION_GIVEN:
 			case CONFIGURATION_ERROR_WEB_SESSION_EXPIRED:
 				return Type.WRONG_CONFIGURATION;
-				
+			
 			case JOB_REQUEST_ERROR_SESSION_DISABLED:
 			case JOB_VALIDATION_ERROR_SESSION_DISABLED:
 				return Type.SESSION_DISABLED;
-				
+			
 			case JOB_REQUEST_ERROR_RENDERER_NOT_AVAILABLE:
 				return Type.RENDERER_NOT_AVAILABLE;
 			
@@ -160,6 +160,8 @@ public class Error {
 				return "Error while downloading project files. Will try another project in a few minutes.";
 			case NOOUTPUTFILE:
 				return "Renderer has generated no output file, possibly a wrong project configuration or you are missing required libraries. Will try another project in a few minutes.";
+			case IMAGE_TOO_LARGE:
+				return "The generated image is too big to be handled by the server. Will try another project in a few minutes.";
 			case RENDERER_CRASHED:
 				return "Renderer has crashed. It's usually due to a bad project or not enough memory. There is nothing you can do about it. Will try another project in a few minutes.";
 			case RENDERER_CRASHED_PYTHON_ERROR:

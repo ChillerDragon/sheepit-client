@@ -2,7 +2,7 @@
  * Copyright (C) 2010-2014 Laurent CLOUET
  * Author Laurent CLOUET <laurent.clouet@nopnop.net>
  *
- * This program is free software; you can redistribute it and/or 
+ * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; version 2
  * of the License.
@@ -37,13 +37,11 @@ public class Windows extends OS {
 		return "windows";
 	}
 	
-	@Override
-	public String getRenderBinaryPath() {
+	@Override public String getRenderBinaryPath() {
 		return "rend.exe";
 	}
 	
-	@Override
-	public CPU getCPU() {
+	@Override public CPU getCPU() {
 		CPU ret = new CPU();
 		try {
 			String[] identifier = java.lang.System.getenv("PROCESSOR_IDENTIFIER").split(" ");
@@ -88,8 +86,7 @@ public class Windows extends OS {
 		return ret;
 	}
 	
-	@Override
-	public long getMemory() {
+	@Override public long getMemory() {
 		try {
 			MEMORYSTATUSEX _memory = new MEMORYSTATUSEX();
 			if (Kernel32.INSTANCE.GlobalMemoryStatusEx(_memory)) {
@@ -102,8 +99,7 @@ public class Windows extends OS {
 		return 0;
 	}
 	
-	@Override
-	public long getFreeMemory() {
+	@Override public long getFreeMemory() {
 		try {
 			MEMORYSTATUSEX _memory = new MEMORYSTATUSEX();
 			if (Kernel32.INSTANCE.GlobalMemoryStatusEx(_memory)) {
@@ -112,18 +108,16 @@ public class Windows extends OS {
 		}
 		catch (Exception e) {
 			e.printStackTrace();
-		}	
-		 
+		}
+		
 		return -1;
 	}
 	
-	@Override
-	public String getCUDALib() {
+	@Override public String getCUDALib() {
 		return "nvcuda";
 	}
 	
-	@Override
-	public Process exec(List<String> command, Map<String, String> env) throws IOException {
+	@Override public Process exec(List<String> command, Map<String, String> env) throws IOException {
 		// disable a popup because the renderer might crash (seg fault)
 		Kernel32Lib kernel32lib = null;
 		try {
@@ -216,13 +210,33 @@ public class Windows extends OS {
 		return process_class;
 	}
 	
-	@Override
-	public boolean kill(Process process) {
+	@Override public boolean kill(Process process) {
 		if (process != null) {
 			WinProcess wproc = new WinProcess(process);
 			wproc.kill();
 			return true;
 		}
 		return false;
+	}
+	
+	@Override public boolean getSupportHighPriority() {
+		return true;
+	}
+	
+	@Override public boolean checkNiceAvailability() {
+		// In windows, nice is not required and therefore we return always true to show the slider in the Settings GUI
+		return true;
+	}
+	
+	@Override public void shutdownComputer(int delayInMinutes) {
+		try {
+			// Shutdown the computer, waiting 60 seconds, force app closure and on the shutdown screen indicate that was initiated by SheepIt app
+			ProcessBuilder builder = new ProcessBuilder("shutdown", "/s", "/f", "/t", String.valueOf(delayInMinutes * 60), "/c", "\"SheepIt App has initiated this computer shutdown.\"");
+			Process process = builder.inheritIO().start();
+		}
+		catch (IOException e) {
+			System.err.println(
+					String.format("Windows::shutdownComputer Unable to execute the command 'shutdown /s /f /t 60...' command. Exception %s", e.getMessage()));
+		}
 	}
 }

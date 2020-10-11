@@ -2,7 +2,7 @@
  * Copyright (C) 2017 Laurent CLOUET
  * Author Laurent CLOUET <laurent.clouet@nopnop.net>
  *
- * This program is free software; you can redistribute it and/or 
+ * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; version 2
  * of the License.
@@ -37,12 +37,12 @@ public class ListGpuParameterHandler<T> extends OptionHandler<T> {
 		super(parser, option, setter);
 	}
 	
-	@Override
-	public int parseArguments(Parameters params) throws CmdLineException {
+	@Override public int parseArguments(Parameters params) throws CmdLineException {
 		List<GPUDevice> gpus = GPU.listDevices(new Configuration(null, null, null));
 		if (gpus != null) {
 			for (GPUDevice gpu : gpus) {
-				System.out.println("Id        : " + gpu.getId());
+				System.out.println("GPU_ID    : " + gpu.getOldId());
+				System.out.println("Long ID   : " + gpu.getId());
 				System.out.println("Model     : " + gpu.getModel());
 				System.out.println("Memory, MB: " + (int) (gpu.getMemory() / (1024 * 1024)));
 				System.out.println();
@@ -53,8 +53,7 @@ public class ListGpuParameterHandler<T> extends OptionHandler<T> {
 		return 0;
 	}
 	
-	@Override
-	public String getDefaultMetaVariable() {
+	@Override public String getDefaultMetaVariable() {
 		return null;
 	}
 }

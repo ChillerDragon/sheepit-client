@@ -2,7 +2,7 @@
  * Copyright (C) 2015 Laurent CLOUET
  * Author Laurent CLOUET <laurent.clouet@nopnop.net>
  *
- * This program is free software; you can redistribute it and/or 
+ * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; version 2
  * of the License.
@@ -19,6 +19,7 @@
 
 package com.sheepit.client.standalone.swing.activity;
 
+import java.awt.Graphics;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.GridLayout;
@@ -26,12 +27,14 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.net.MalformedURLException;
 import java.util.Hashtable;
 import java.util.LinkedList;
 import java.util.List;
 
+import javax.imageio.ImageIO;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -82,6 +85,7 @@ public class Settings implements Activity {
 	private JFileChooser cacheDirChooser;
 	private JCheckBox useCPU;
 	private List<JCheckBoxGPU> useGPUs;
+	private JCheckBox useSysTray;
 	private JLabel renderbucketSizeLabel;
 	private JSlider renderbucketSize;
 	private JSlider cpuCores;
@@ -94,12 +98,13 @@ public class Settings implements Activity {
 	private ButtonGroup themeOptionsGroup;
 	private JRadioButton lightMode;
 	private JRadioButton darkMode;
-
+	
 	private JCheckBox saveFile;
 	private JCheckBox autoSignIn;
 	JButton saveButton;
 	
 	private boolean haveAutoStarted;
+	private boolean useSysTrayPrevState;
 	
 	public Settings(GuiSwing parent_) {
 		parent = parent_;
@@ -108,22 +113,39 @@ public class Settings implements Activity {
 		haveAutoStarted = false;
 	}
 	
-	@Override
-	public void show() {
+	@Override public void show() {
 		Configuration config = parent.getConfiguration();
 		new SettingsLoader(config.getConfigFilePath()).merge(config);
+		useSysTrayPrevState = config.isUseSysTray();
 		
-		applyTheme(config.getTheme());	// apply the proper theme (light/dark)
-
+		applyTheme(config.getTheme());    // apply the proper theme (light/dark)
+		
 		List<GPUDevice> gpus = GPU.listDevices(config);
 		useGPUs.clear();    // Empty the auxiliary list (used in the list of checkboxes)
 		
 		GridBagConstraints constraints = new GridBagConstraints();
 		int currentRow = 0;
-		ImageIcon image = new ImageIcon(getClass().getResource("/sheepit-logo.png"));
+		
+		JLabel labelImage;
+		try {
+			// Include the version of the app as a watermark in the SheepIt logo.
+			final BufferedImage watermark = ImageIO.read(getClass().getResource("/sheepit-logo.png"));
+			
+			Graphics gph = watermark.getGraphics();
+			gph.setFont(gph.getFont().deriveFont(12f));
+			gph.drawString("v" + config.getJarVersion(), 335, 120);
+			gph.dispose();
+			
+			labelImage = new JLabel(new ImageIcon(watermark));
+		}
+		catch (Exception e) {
+			// If something fails, we just show the SheepIt logo (without any watermark)
+			ImageIcon image = new ImageIcon(getClass().getResource("/sheepit-logo.png"));
+			labelImage = new JLabel(image);
+		}
+		
 		constraints.fill = GridBagConstraints.CENTER;
 		
-		JLabel labelImage = new JLabel(image);
 		constraints.gridwidth = 2;
 		constraints.gridx = 0;
 		constraints.gridy = currentRow;
@@ -132,10 +154,10 @@ public class Settings implements Activity {
 		++currentRow;
 		
 		constraints.gridy = currentRow;
-		parent.getContentPane().add(new JLabel(" "), constraints);	// Add a separator between logo and first panel
-
+		parent.getContentPane().add(new JLabel(" "), constraints);    // Add a separator between logo and first panel
+		
 		currentRow++;
-
+		
 		// authentication
 		CollapsibleJPanel authentication_panel = new CollapsibleJPanel(new GridLayout(2, 2));
 		authentication_panel.setBorder(BorderFactory.createTitledBorder("Authentication"));
@@ -165,33 +187,33 @@ public class Settings implements Activity {
 		// Theme selection panel
 		CollapsibleJPanel themePanel = new CollapsibleJPanel(new GridLayout(1, 3));
 		themePanel.setBorder(BorderFactory.createTitledBorder("Theme"));
-
+		
 		themeOptionsGroup = new ButtonGroup();
-
+		
 		lightMode = new JRadioButton("Light");
 		lightMode.setActionCommand("light");
 		lightMode.setSelected(config.getTheme().equals("light"));
 		lightMode.addActionListener(new ApplyThemeAction());
-
+		
 		darkMode = new JRadioButton("Dark");
 		darkMode.setActionCommand("dark");
 		darkMode.setSelected(config.getTheme().equals("dark"));
 		darkMode.addActionListener(new ApplyThemeAction());
-
+		
 		themePanel.add(lightMode);
 		themePanel.add(darkMode);
-
+		
 		// Group both radio buttons to allow only one selected
 		themeOptionsGroup.add(lightMode);
 		themeOptionsGroup.add(darkMode);
-
+		
 		currentRow++;
 		constraints.gridx = 0;
 		constraints.gridy = currentRow;
 		constraints.gridwidth = 2;
-
+		
 		parent.getContentPane().add(themePanel, constraints);
-
+		
 		// directory
 		CollapsibleJPanel directory_panel = new CollapsibleJPanel(new GridLayout(1, 3));
 		directory_panel.setBorder(BorderFactory.createTitledBorder("Cache"));
@@ -260,7 +282,7 @@ public class Settings implements Activity {
 		
 		if (gpus.size() > 0) {
 			renderbucketSizeLabel = new JLabel("Renderbucket size:");
-			renderbucketSize      = new JSlider();
+			renderbucketSize = new JSlider();
 			renderbucketSize.setMajorTickSpacing(1);
 			renderbucketSize.setMinorTickSpacing(1);
 			renderbucketSize.setPaintTicks(true);
@@ -291,8 +313,8 @@ public class Settings implements Activity {
 			// Initialisation values will apply if we are not  able to detect the proper GPU technology or
 			// because is a new one (different from CUDA and OPENCL). In that case, move into a safe position
 			// of 32x32 pixel render bucket and a maximum of 128x128 pixel for the "unknown GPU"
-			int maxRenderbucketSize   = 128;
-			int recommendedBucketSize = 32;
+			int maxRenderbucketSize = 128;
+			int recommendedBucketSize = GPU.MIN_RENDERBUCKET_SIZE;
 			
 			if (config.getComputeMethod() == ComputeType.GPU || config.getComputeMethod() == ComputeType.CPU_GPU) {
 				GPULister gpu;
@@ -308,7 +330,7 @@ public class Settings implements Activity {
 					recommendedBucketSize = gpu.getRecommendedRenderBucketSize(config.getGPUDevice().getMemory());
 				}
 			}
-
+			
 			buildRenderBucketSizeSlider(maxRenderbucketSize, config.getRenderbucketSize() != -1 ?
 					((int) (Math.log(config.getRenderbucketSize()) / Math.log(2))) - 5 :
 					((int) (Math.log(recommendedBucketSize) / Math.log(2))) - 5);
@@ -331,14 +353,14 @@ public class Settings implements Activity {
 		CPU cpu = new CPU();
 		if (cpu.cores() > 1) { // if only one core is available, no need to show the choice
 			double step = 1;
-			double display = (double)cpu.cores() / step;
+			double display = (double) cpu.cores() / step;
 			while (display > 10) {
 				step += 1.0;
-				display = (double)cpu.cores() / step;
+				display = (double) cpu.cores() / step;
 			}
 			
 			cpuCores = new JSlider(1, cpu.cores());
-			cpuCores.setMajorTickSpacing((int)(step));
+			cpuCores.setMajorTickSpacing((int) (step));
 			cpuCores.setMinorTickSpacing(1);
 			cpuCores.setPaintTicks(true);
 			cpuCores.setPaintLabels(true);
@@ -365,10 +387,10 @@ public class Settings implements Activity {
 		int all_ram = (int) os.getMemory();
 		ram = new JSlider(0, all_ram);
 		int step = 1000000;
-		double display = (double)all_ram / (double)step;
+		double display = (double) all_ram / (double) step;
 		while (display > 10) {
 			step += 1000000;
-			display = (double)all_ram / (double)step;
+			display = (double) all_ram / (double) step;
 		}
 		Hashtable<Integer, JLabel> labelTable = new Hashtable<Integer, JLabel>();
 		for (int g = 0; g < all_ram; g += step) {
@@ -378,7 +400,7 @@ public class Settings implements Activity {
 		ram.setLabelTable(labelTable);
 		ram.setPaintTicks(true);
 		ram.setPaintLabels(true);
-		ram.setValue((int)(config.getMaxMemory() != -1 ? config.getMaxMemory() : os.getMemory()));
+		ram.setValue((int) (config.getMaxMemory() != -1 ? config.getMaxMemory() : os.getMemory()));
 		JLabel ramLabel = new JLabel("Memory:");
 		
 		compute_devices_constraints.weightx = 1.0 / gpus.size();
@@ -405,7 +427,11 @@ public class Settings implements Activity {
 		priority.setPaintTicks(true);
 		priority.setPaintLabels(true);
 		priority.setValue(config.getPriority());
-		JLabel priorityLabel = new JLabel(high_priority_support ? "Priority (High <-> Low):" : "Priority (Normal <-> Low):" );
+		JLabel priorityLabel = new JLabel(high_priority_support ? "Priority (High <-> Low):" : "Priority (Normal <-> Low):");
+		
+		boolean showPrioritySlider = os.checkNiceAvailability();
+		priority.setVisible(showPrioritySlider);
+		priorityLabel.setVisible(showPrioritySlider);
 		
 		compute_devices_constraints.weightx = 1.0 / gpus.size();
 		compute_devices_constraints.gridx = 0;
@@ -427,8 +453,15 @@ public class Settings implements Activity {
 		parent.getContentPane().add(compute_devices_panel, constraints);
 		
 		// other
-		CollapsibleJPanel advanced_panel = new CollapsibleJPanel(new GridLayout(3, 2));
+		CollapsibleJPanel advanced_panel = new CollapsibleJPanel(new GridLayout(4, 2));
 		advanced_panel.setBorder(BorderFactory.createTitledBorder("Advanced options"));
+		
+		JLabel useSysTrayLabel = new JLabel("Minimize to SysTray");
+		
+		useSysTray = new JCheckBox();
+		useSysTray.setSelected(config.isUseSysTray());
+		advanced_panel.add(useSysTrayLabel);
+		advanced_panel.add(useSysTray);
 		
 		JLabel proxyLabel = new JLabel("Proxy:");
 		proxyLabel.setToolTipText("http://login:password@host:port");
@@ -452,7 +485,7 @@ public class Settings implements Activity {
 		if (parent.getConfiguration().getMaxRenderTime() > 0) {
 			val = parent.getConfiguration().getMaxRenderTime() / 60;
 		}
-		renderTime = new JSpinner(new SpinnerNumberModel(val,0,1000,1));
+		renderTime = new JSpinner(new SpinnerNumberModel(val, 0, 1000, 1));
 		
 		advanced_panel.add(renderTimeLabel);
 		advanced_panel.add(renderTime);
@@ -462,7 +495,6 @@ public class Settings implements Activity {
 		constraints.gridy = currentRow;
 		constraints.gridwidth = 2;
 		parent.getContentPane().add(advanced_panel, constraints);
-		advanced_panel.setCollapsed(true);
 		
 		// general settings
 		JPanel general_panel = new JPanel(new GridLayout(1, 2));
@@ -482,8 +514,8 @@ public class Settings implements Activity {
 		
 		currentRow++;
 		constraints.gridy = currentRow;
-		parent.getContentPane().add(new JLabel(" "), constraints);	// Add a separator between last checkboxes and button
-
+		parent.getContentPane().add(new JLabel(" "), constraints);    // Add a separator between last checkboxes and button
+		
 		currentRow++;
 		String buttonText = "Start";
 		if (parent.getClient() != null) {
@@ -499,6 +531,9 @@ public class Settings implements Activity {
 		constraints.gridx = 0;
 		constraints.gridy = currentRow;
 		parent.getContentPane().add(saveButton, constraints);
+
+		// Increase the size of the app Window to ensure it shows all the information with the Advanced Options panel opened.
+		parent.setSize(520,850);
 		
 		if (haveAutoStarted == false && config.isAutoSignIn() && checkDisplaySaveButton()) {
 			// auto start
@@ -540,19 +575,20 @@ public class Settings implements Activity {
 		if (login.getText().isEmpty() || password.getPassword().length == 0 || Proxy.isValidURL(proxy.getText()) == false) {
 			selected = false;
 		}
-
+		
 		saveButton.setEnabled(selected);
 		return selected;
 	}
-
+	
 	private void applyTheme(String theme_) {
 		try {
 			if (theme_.equals("light")) {
 				UIManager.setLookAndFeel(new FlatLightLaf());
-			} else if (theme_.equals("dark")) {
+			}
+			else if (theme_.equals("dark")) {
 				UIManager.setLookAndFeel(new FlatDarkLaf());
 			}
-
+			
 			// Apply the new theme
 			FlatLaf.updateUI();
 		}
@@ -563,9 +599,10 @@ public class Settings implements Activity {
 	
 	class ChooseFileAction implements ActionListener {
 		
-		@Override
-		public void actionPerformed(ActionEvent arg0) {
-			JOptionPane.showMessageDialog(parent.getContentPane(), "<html>The working directory has to be dedicated directory. <br />Caution, everything not related to SheepIt-Renderfarm will be removed.<br />You should create a directory specifically for it.</html>", "Warning: files will be removed!", JOptionPane.WARNING_MESSAGE);
+		@Override public void actionPerformed(ActionEvent arg0) {
+			JOptionPane.showMessageDialog(parent.getContentPane(),
+					"<html>The working directory has to be dedicated directory. <br />Caution, everything not related to SheepIt-Renderfarm will be removed.<br />You should create a directory specifically for it.</html>",
+					"Warning: files will be removed!", JOptionPane.WARNING_MESSAGE);
 			int returnVal = cacheDirChooser.showOpenDialog(parent.getContentPane());
 			if (returnVal == JFileChooser.APPROVE_OPTION) {
 				File file = cacheDirChooser.getSelectedFile();
@@ -577,16 +614,14 @@ public class Settings implements Activity {
 	
 	class CpuChangeAction implements ActionListener {
 		
-		@Override
-		public void actionPerformed(ActionEvent e) {
+		@Override public void actionPerformed(ActionEvent e) {
 			checkDisplaySaveButton();
 		}
 	}
 	
 	class GpuChangeAction implements ActionListener {
 		
-		@Override
-		public void actionPerformed(ActionEvent e) {
+		@Override public void actionPerformed(ActionEvent e) {
 			renderbucketSizeLabel.setVisible(false);
 			renderbucketSize.setVisible(false);
 			
@@ -597,8 +632,8 @@ public class Settings implements Activity {
 				}
 				else {
 					GPULister gpu;
-					int maxRenderbucketSize = 128;		// Max default render bucket size
-					int recommendedBucketSize = 32;		// Default recommended render bucket size
+					int maxRenderbucketSize = 128;        // Max default render bucket size
+					int recommendedBucketSize = GPU.MIN_RENDERBUCKET_SIZE; 	// Default recommended render bucket size
 					
 					if (useGPUs.get(counter).getGPUDevice().getType().equals("CUDA")) {
 						gpu = new Nvidia();
@@ -631,8 +666,7 @@ public class Settings implements Activity {
 	
 	class AutoSignInChangeAction implements ActionListener {
 		
-		@Override
-		public void actionPerformed(ActionEvent e) {
+		@Override public void actionPerformed(ActionEvent e) {
 			if (autoSignIn.isSelected()) {
 				saveFile.setSelected(true);
 			}
@@ -640,16 +674,14 @@ public class Settings implements Activity {
 	}
 	
 	class ApplyThemeAction implements ActionListener {
-		@Override
-		public void actionPerformed(ActionEvent e) {
+		@Override public void actionPerformed(ActionEvent e) {
 			applyTheme(themeOptionsGroup.getSelection().getActionCommand());
 		}
 	}
-
+	
 	class SaveAction implements ActionListener {
 		
-		@Override
-		public void actionPerformed(ActionEvent e) {
+		@Override public void actionPerformed(ActionEvent e) {
 			if (parent == null) {
 				return;
 			}
@@ -658,7 +690,7 @@ public class Settings implements Activity {
 			if (config == null) {
 				return;
 			}
-
+			
 			if (themeOptionsGroup.getSelection().getActionCommand() != null)
 				config.setTheme(themeOptionsGroup.getSelection().getActionCommand());
 			
@@ -720,7 +752,7 @@ public class Settings implements Activity {
 			
 			int max_rendertime = -1;
 			if (renderTime != null) {
-				max_rendertime = (Integer)renderTime.getValue() * 60;
+				max_rendertime = (Integer) renderTime.getValue() * 60;
 				config.setMaxRenderTime(max_rendertime);
 			}
 			
@@ -752,28 +784,19 @@ public class Settings implements Activity {
 			}
 			
 			if (saveFile.isSelected()) {
-				parent.setSettingsLoader(new SettingsLoader(
-						config.getConfigFilePath(),
-						login.getText(),
-						new String(password.getPassword()),
-						proxyText,
-						hostnameText,
-						method,
-						selected_gpu,
-						renderbucket_size,
-						cpu_cores,
-						max_ram,
-						max_rendertime,
-						cachePath,
-						autoSignIn.isSelected(),
-						GuiSwing.type,
-						themeOptionsGroup.getSelection().getActionCommand(),	// selected theme
-						priority.getValue()));
+				parent.setSettingsLoader(
+						new SettingsLoader(config.getConfigFilePath(), login.getText(), new String(password.getPassword()), proxyText, hostnameText, method,
+								selected_gpu, renderbucket_size, cpu_cores, max_ram, max_rendertime, cachePath, autoSignIn.isSelected(), useSysTray.isSelected(),
+								GuiSwing.type, themeOptionsGroup.getSelection().getActionCommand(), priority.getValue()));
 				
 				// wait for successful authentication (to store the public key)
 				// or do we already have one?
 				if (parent.getClient().getServer().getServerConfig() != null && parent.getClient().getServer().getServerConfig().getPublickey() != null) {
 					parent.getSettingsLoader().saveFile();
+				}
+				
+				if (useSysTrayPrevState != useSysTray.isSelected()) {
+					JOptionPane.showMessageDialog(null, "You must restart the SheepIt app for the SysTray change to take effect");
 				}
 			}
 		}
@@ -794,17 +817,14 @@ public class Settings implements Activity {
 	
 	public class CheckCanStart implements KeyListener {
 		
-		@Override
-		public void keyPressed(KeyEvent arg0) {
+		@Override public void keyPressed(KeyEvent arg0) {
 		}
 		
-		@Override
-		public void keyReleased(KeyEvent arg0) {
+		@Override public void keyReleased(KeyEvent arg0) {
 			checkDisplaySaveButton();
 		}
 		
-		@Override
-		public void keyTyped(KeyEvent arg0) {
+		@Override public void keyTyped(KeyEvent arg0) {
 		}
 		
 	}

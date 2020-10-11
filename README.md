@@ -8,14 +8,14 @@ SheepIt Render Farm Client is an *Open Source* client for the distributed render
 
 ## Compilation
 
-You will need Java 1.7 or higher. (OpenJDK and Oracle are both supported).
+You will need Java 1.8 or higher. (OpenJDK and Oracle are both supported).
 To create the jar file, simply type `./gradlew shadowJar` on linux/OSX and `gradlew.bat shadowJar` on Windows in the project's root directory.
 
 ## Usage
 
 Once you have the jar file, you can see how to use it by running:
 
-    java -jar build/libs/sheepit-client.jar --help
+    java -jar build/libs/sheepit-client-all.jar --help
 
 When you are doing development work, you can use a mirror of the main site specially made for demo/dev. The mirror is located at **http://sandbox.sheepit-renderfarm.com**, and you can use it by passing `-server http://sandbox.sheepit-renderfarm.com` to your invocation of the client.
 

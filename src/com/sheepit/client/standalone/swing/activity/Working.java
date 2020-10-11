@@ -2,7 +2,7 @@
  * Copyright (C) 2015 Laurent CLOUET
  * Author Laurent CLOUET <laurent.clouet@nopnop.net>
  *
- * This program is free software; you can redistribute it and/or 
+ * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; version 2
  * of the License.
@@ -49,6 +49,7 @@ import com.sheepit.client.Client;
 import com.sheepit.client.Job;
 import com.sheepit.client.Log;
 import com.sheepit.client.Stats;
+import com.sheepit.client.TransferStats;
 import com.sheepit.client.Utils;
 import com.sheepit.client.standalone.GuiSwing;
 import com.sheepit.client.standalone.GuiSwing.ActivityType;
@@ -75,6 +76,8 @@ public class Working implements Activity {
 	private JLabel connected_machines_value;
 	private JLabel user_info_total_rendertime_this_session_value;
 	private JLabel userInfoQueuedUploadsAndSizeValue;
+	private JLabel sessionDownloadsStatsValue;
+	private JLabel sessionUploadsStatsValue;
 	private String currentTheme;
 	private Log log;
 	
@@ -97,13 +100,14 @@ public class Working implements Activity {
 		lastRenderTime = new JLabel("");
 		lastRender = new JLabel("");
 		userInfoQueuedUploadsAndSizeValue = new JLabel("0");
+		sessionDownloadsStatsValue = new JLabel("0KB");
+		sessionUploadsStatsValue = new JLabel("0KB");
 		currentTheme = UIManager.getLookAndFeel().getName();    // Capture the theme on component instantiation
 		previousStatus = "";
 		log = Log.getInstance(parent_.getConfiguration());
 	}
 	
-	@Override
-	public void show() {
+	@Override public void show() {
 		// If the stored theme and the UIManager's theme doesn't match is bc the user has changed it
 		if (!currentTheme.equals(UIManager.getLookAndFeel().getName())) {
 			// And, as the user has changed the theme, then we must recreate all the UI elements with session data
@@ -127,11 +131,13 @@ public class Working implements Activity {
 			lastRenderTime = new JLabel(lastRenderTime.getText());
 			lastRender = new JLabel(lastRender.getText());
 			userInfoQueuedUploadsAndSizeValue = new JLabel(userInfoQueuedUploadsAndSizeValue.getText());
-
+			sessionDownloadsStatsValue = new JLabel(sessionDownloadsStatsValue.getText());
+			sessionUploadsStatsValue = new JLabel(sessionUploadsStatsValue.getText());
+			
 			// set the new theme as the current one
 			currentTheme = UIManager.getLookAndFeel().getName();
 		}
-
+		
 		// current project
 		JPanel current_project_panel = new JPanel(new SpringLayout());
 		current_project_panel.setBorder(BorderFactory.createTitledBorder("Project"));
@@ -164,6 +170,8 @@ public class Working implements Activity {
 		JLabel user_info_credits_this_session = new JLabel("Points earned: ", JLabel.TRAILING);
 		JLabel user_info_total_rendertime_this_session = new JLabel("Duration: ", JLabel.TRAILING);
 		JLabel user_info_pending_uploads_and_size = new JLabel("Queued uploads: ", JLabel.TRAILING);
+		JLabel session_download_stats = new JLabel("Total Downloads: ", JLabel.TRAILING);
+		JLabel session_upload_stats = new JLabel("Total Uploads: ", JLabel.TRAILING);
 		JLabel user_info_rendered_frame_this_session = new JLabel("Rendered frames: ", JLabel.TRAILING);
 		JLabel global_static_renderable_project = new JLabel("Renderable projects: ", JLabel.TRAILING);
 		
@@ -175,6 +183,12 @@ public class Working implements Activity {
 		
 		session_info_panel.add(user_info_pending_uploads_and_size);
 		session_info_panel.add(userInfoQueuedUploadsAndSizeValue);
+		
+		session_info_panel.add(session_download_stats);
+		session_info_panel.add(sessionDownloadsStatsValue);
+		
+		session_info_panel.add(session_upload_stats);
+		session_info_panel.add(sessionUploadsStatsValue);
 		
 		session_info_panel.add(global_static_renderable_project);
 		session_info_panel.add(renderable_projects_value);
@@ -248,12 +262,12 @@ public class Working implements Activity {
 		global_constraints.weightx = 1;
 		global_constraints.gridx = 0;
 		
-		parent.getContentPane().add(new JLabel(" "), global_constraints);		// Add a separator between logo and first panel
+		parent.getContentPane().add(new JLabel(" "), global_constraints);        // Add a separator between logo and first panel
 		parent.getContentPane().add(current_project_panel, global_constraints);
 		parent.getContentPane().add(global_stats_panel, global_constraints);
 		parent.getContentPane().add(session_info_panel, global_constraints);
 		parent.getContentPane().add(last_frame_panel, global_constraints);
-		parent.getContentPane().add(new JLabel(" "), global_constraints);		// Add a separator between last panel and buttons
+		parent.getContentPane().add(new JLabel(" "), global_constraints);        // Add a separator between last panel and buttons
 		parent.getContentPane().add(buttonsPanel, global_constraints);
 		
 		Spring widthLeftColumn = getBestWidth(current_project_panel, 4, 2);
@@ -261,7 +275,10 @@ public class Working implements Activity {
 		widthLeftColumn = Spring.max(widthLeftColumn, getBestWidth(session_info_panel, 4, 2));
 		alignPanel(current_project_panel, 5, 2, widthLeftColumn);
 		alignPanel(global_stats_panel, 4, 2, widthLeftColumn);
-		alignPanel(session_info_panel, 5, 2, widthLeftColumn);
+		alignPanel(session_info_panel, 7, 2, widthLeftColumn);
+		
+		// Set the proper size for the Working (if coming from Settings screen, the window size will be too big for the content!)
+		parent.setSize(520, 820);
 	}
 	
 	public void setStatus(String msg_) {
@@ -301,6 +318,12 @@ public class Working implements Activity {
 		this.current_project_compute_method_value.setText(computeMethod_);
 	}
 	
+	public void displayTransferStats(TransferStats downloads, TransferStats uploads) {
+		sessionDownloadsStatsValue.setText(String.format("%s @ %s/s", downloads.getSessionTraffic(), downloads.getAverageSessionSpeed()));
+		sessionUploadsStatsValue.setText(String.format("%s @ %s/s", uploads.getSessionTraffic(), uploads.getAverageSessionSpeed()));
+		updateTime();
+	}
+	
 	public void displayStats(Stats stats) {
 		DecimalFormat df = new DecimalFormat("##,##,##,##,##,##,##0");
 		remainingFrameContent.setText(df.format(stats.getRemainingFrame()));
@@ -314,11 +337,9 @@ public class Working implements Activity {
 	}
 	
 	public void displayUploadQueueStats(int queueSize, long queueVolume) {
-		userInfoQueuedUploadsAndSizeValue.setText(String.format("%d%s%s",
-				queueSize,
-				(queueSize > 0 ? String.format(" (%.2fMB) ", (queueVolume / 1024.0 / 1024.0)) : ""),
-				(queueSize == this.parent.getConfiguration().getMaxUploadingJob() ? "- Queue full!" : "")
-		));
+		userInfoQueuedUploadsAndSizeValue.setText(
+				String.format("%d%s%s", queueSize, (queueSize > 0 ? String.format(" (%.2fMB) ", (queueVolume / 1024.0 / 1024.0)) : ""),
+						(queueSize == this.parent.getConfiguration().getMaxUploadingJob() ? "- Queue full!" : "")));
 		
 		// If the user has requested to exit, then we need to update the JButton with the queue size
 		if (this.exitAfterFrame.getText().startsWith("Cancel")) {
@@ -330,20 +351,19 @@ public class Working implements Activity {
 				}
 			}
 			
-			exitAfterFrame.setText(String.format("Cancel exit (%s frame%s to go)",
-					queueSize,
-					(queueSize > 1 ? "s" : ""))
-			);
+			exitAfterFrame.setText(String.format("Cancel exit (%s frame%s to go)", queueSize, (queueSize > 1 ? "s" : "")));
 		}
 	}
 	
-	public void updateTime() {
+	public synchronized void updateTime() {
 		if (this.parent.getClient().getStartTime() != 0) {
-			user_info_total_rendertime_this_session_value.setText(Utils.humanDuration(new Date((new Date().getTime() - this.parent.getClient().getStartTime()))));
+			user_info_total_rendertime_this_session_value
+					.setText(Utils.humanDuration(new Date((new Date().getTime() - this.parent.getClient().getStartTime()))));
 		}
 		Job job = this.parent.getClient().getRenderingJob();
 		if (job != null && job.getProcessRender() != null && job.getProcessRender().getStartTime() > 0) {
-			current_project_duration_value.setText("<html>" + Utils.humanDuration(new Date((new Date().getTime() - job.getProcessRender().getStartTime()))) + "</html>");
+			current_project_duration_value
+					.setText("<html>" + Utils.humanDuration(new Date((new Date().getTime() - job.getProcessRender().getStartTime()))) + "</html>");
 		}
 		else {
 			current_project_duration_value.setText("");
@@ -371,7 +391,7 @@ public class Working implements Activity {
 				else {
 					try {
 						String path = lastJob.getOutputImagePath();
-
+						
 						BufferedImage img = ImageIO.read(new File(path));
 						float width = img.getWidth();
 						float height = img.getHeight();
@@ -386,16 +406,16 @@ public class Working implements Activity {
 					}
 					catch (IOException e) {
 						log.error(String.format("Working::showLastRender() Unable to load/preview rendered frame [%s]. Exception %s",
-								lastJob.getOutputImagePath(),
-								e.getMessage()));
+								lastJob.getOutputImagePath(), e.getMessage()));
 					}
 				}
-
+				
 				if (icon != null) {
 					lastRender.setIcon(icon);
 					// don't use lastJob.getProcessRender().getDuration() due to timezone
 					if (lastJob.getProcessRender().getDuration() > 1) {
-						lastRenderTime.setText("Render time : " + Utils.humanDuration(new Date(lastJob.getProcessRender().getEndTime() - lastJob.getProcessRender().getStartTime())));
+						lastRenderTime.setText("Render time : " + Utils
+								.humanDuration(new Date(lastJob.getProcessRender().getEndTime() - lastJob.getProcessRender().getStartTime())));
 					}
 				}
 			}
@@ -463,8 +483,7 @@ public class Working implements Activity {
 	
 	class PauseAction implements ActionListener {
 		
-		@Override
-		public void actionPerformed(ActionEvent e) {
+		@Override public void actionPerformed(ActionEvent e) {
 			Client client = parent.getClient();
 			if (client != null) {
 				if (client.isSuspended()) {
@@ -482,8 +501,7 @@ public class Working implements Activity {
 	}
 	
 	class SettingsAction implements ActionListener {
-		@Override
-		public void actionPerformed(ActionEvent e) {
+		@Override public void actionPerformed(ActionEvent e) {
 			if (parent != null) {
 				parent.showActivity(ActivityType.SETTINGS);
 			}
@@ -491,34 +509,22 @@ public class Working implements Activity {
 	}
 	
 	class ExitAfterAction implements ActionListener {
-		@Override
-		public void actionPerformed(ActionEvent e) {
+		@Override public void actionPerformed(ActionEvent e) {
 			Client client = parent.getClient();
 			if (client != null) {
 				if (client.isRunning()) {
-					String[] exitJobOptions = {"Exit after current Jobs", "Exit Immediately", "Do Nothing"};
+					String[] exitJobOptions = { "Exit after current Jobs", "Exit Immediately", "Do Nothing" };
 					int jobsQueueSize = client.getUploadQueueSize() + (client.isRunning() ? 1 : 0);
-
-					int userDecision = JOptionPane.showOptionDialog(
-							null,
-							String.format("<html>You have <strong>%d frame%s</strong> being uploaded or rendered. Do you want to finish the jobs or exit now?.\n\n",
-									jobsQueueSize ,   // Add the current frame to the total count ONLY if the client is running
-									(jobsQueueSize > 1 ? "s" : ""),
-									(jobsQueueSize > 1 ? (jobsQueueSize + " ") : ""),
-									(jobsQueueSize > 1 ? "s" : "")
-							),
-							"Exit Now or Later",
-							JOptionPane.DEFAULT_OPTION,
-							JOptionPane.QUESTION_MESSAGE,
-							null,
-							exitJobOptions,
+					
+					int userDecision = JOptionPane.showOptionDialog(null, String.format(
+							"<html>You have <strong>%d frame%s</strong> being uploaded or rendered. Do you want to finish the jobs or exit now?.\n\n",
+							jobsQueueSize,   // Add the current frame to the total count ONLY if the client is running
+							(jobsQueueSize > 1 ? "s" : ""), (jobsQueueSize > 1 ? (jobsQueueSize + " ") : ""), (jobsQueueSize > 1 ? "s" : "")),
+							"Exit Now or Later", JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null, exitJobOptions,
 							exitJobOptions[2]);    // Make the "Do nothing" button the default one to avoid mistakes
 					
 					if (userDecision == 0) {
-						exitAfterFrame.setText(String.format("Cancel exit (%s frame%s to go)",
-								jobsQueueSize,
-								(jobsQueueSize > 1 ? "s" : ""))
-						);
+						exitAfterFrame.setText(String.format("Cancel exit (%s frame%s to go)", jobsQueueSize, (jobsQueueSize > 1 ? "s" : "")));
 						
 						client.askForStop();
 					}
@@ -536,8 +542,7 @@ public class Working implements Activity {
 	}
 	
 	class blockJobAction implements ActionListener {
-		@Override
-		public void actionPerformed(ActionEvent e) {
+		@Override public void actionPerformed(ActionEvent e) {
 			Client client = parent.getClient();
 			if (client != null) {
 				Job job = client.getRenderingJob();

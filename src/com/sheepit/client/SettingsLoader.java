@@ -2,7 +2,7 @@
  * Copyright (C) 2015 Laurent CLOUET
  * Author Laurent CLOUET <laurent.clouet@nopnop.net>
  *
- * This program is free software; you can redistribute it and/or 
+ * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; version 2
  * of the License.
@@ -32,7 +32,6 @@ import java.util.HashSet;
 import java.util.Properties;
 import java.util.Set;
 
-import com.sheepit.client.Configuration;
 import com.sheepit.client.Configuration.ComputeType;
 import com.sheepit.client.hardware.gpu.GPU;
 import com.sheepit.client.hardware.gpu.GPUDevice;
@@ -43,8 +42,7 @@ public class SettingsLoader {
 	
 	private String login;
 	
-	@Setter
-	private String password;
+	@Setter private String password;
 	
 	private String proxy;
 	private String hostname;
@@ -56,9 +54,10 @@ public class SettingsLoader {
 	private String renderTime;
 	private String cacheDir;
 	private String autoSignIn;
+	private String useSysTray;
 	private String ui;
 	private String theme;
-	private int    priority;
+	private int priority;
 	
 	public SettingsLoader(String path_) {
 		if (path_ == null) {
@@ -69,7 +68,9 @@ public class SettingsLoader {
 		}
 	}
 	
-	public SettingsLoader(String path_, String login_, String password_, String proxy_, String hostname_, ComputeType computeMethod_, GPUDevice gpu_, int renderbucketSize_, int cores_, long maxRam_, int maxRenderTime_, String cacheDir_, boolean autoSignIn_, String ui_, String theme_, int priority_) {
+	public SettingsLoader(String path_, String login_, String password_, String proxy_, String hostname_, ComputeType computeMethod_, GPUDevice gpu_,
+		int renderbucketSize_, int cores_, long maxRam_, int maxRenderTime_, String cacheDir_, boolean autoSignIn_, boolean useSysTray_, String ui_,
+		String theme_, int priority_) {
 		if (path_ == null) {
 			path = getDefaultFilePath();
 		}
@@ -82,10 +83,11 @@ public class SettingsLoader {
 		hostname = hostname_;
 		cacheDir = cacheDir_;
 		autoSignIn = String.valueOf(autoSignIn_);
+		useSysTray = String.valueOf(useSysTray_);
 		ui = ui_;
 		priority = priority_;
 		theme = theme_;
-
+		
 		if (cores_ > 0) {
 			cores = String.valueOf(cores_);
 		}
@@ -107,7 +109,7 @@ public class SettingsLoader {
 			gpu = gpu_.getId();
 		}
 		
-		if (renderbucketSize_ >= 32) {
+		if (renderbucketSize_ >= GPU.MIN_RENDERBUCKET_SIZE) {
 			renderbucketSize = String.valueOf(renderbucketSize_);
 		}
 	}
@@ -175,10 +177,14 @@ public class SettingsLoader {
 				prop.setProperty("auto-signin", autoSignIn);
 			}
 			
+			if (useSysTray != null) {
+				prop.setProperty("use-systray", useSysTray);
+			}
+			
 			if (ui != null) {
 				prop.setProperty("ui", ui);
 			}
-
+			
 			if (theme != null) {
 				prop.setProperty("theme", theme);
 			}
@@ -225,6 +231,7 @@ public class SettingsLoader {
 		this.renderbucketSize = null;
 		this.cacheDir = null;
 		this.autoSignIn = null;
+		this.useSysTray = null;
 		this.ui = null;
 		this.priority = 19; // must be the same default as Configuration
 		this.ram = null;
@@ -293,6 +300,10 @@ public class SettingsLoader {
 				this.autoSignIn = prop.getProperty("auto-signin");
 			}
 			
+			if (prop.containsKey("use-systray")) {
+				this.useSysTray = prop.getProperty("use-systray");
+			}
+			
 			if (prop.containsKey("ui")) {
 				this.ui = prop.getProperty("ui");
 			}
@@ -300,7 +311,7 @@ public class SettingsLoader {
 			if (prop.containsKey("theme")) {
 				this.theme = prop.getProperty("theme");
 			}
-
+			
 			if (prop.containsKey("priority")) {
 				this.priority = Integer.parseInt(prop.getProperty("priority"));
 			}
@@ -350,8 +361,15 @@ public class SettingsLoader {
 			config.setUsePriority(priority);
 		}
 		try {
-			if ((config.getComputeMethod() == null && computeMethod != null) || (computeMethod != null && config.getComputeMethod() != ComputeType.valueOf(computeMethod))) {
-				config.setComputeMethod(ComputeType.valueOf(computeMethod));
+			if (config.getComputeMethod() == null && computeMethod == null) {
+				config.setComputeMethod(ComputeType.CPU);
+			}
+			else if ((config.getComputeMethod() == null && computeMethod != null) || (computeMethod != null && config.getComputeMethod() != ComputeType
+				.valueOf(computeMethod))) {
+				if (config.getComputeMethod() == null) {
+					config.setComputeMethod(ComputeType.valueOf(computeMethod));
+				}
+				
 			}
 		}
 		catch (IllegalArgumentException e) {
@@ -364,7 +382,7 @@ public class SettingsLoader {
 				config.setGPUDevice(device);
 				
 				// If the user has indicated a render bucket size at least 32x32 px, overwrite the config file value
-				if (config.getRenderbucketSize() >= 32) {
+				if (config.getRenderbucketSize() >= GPU.MIN_RENDERBUCKET_SIZE) {
 					config.getGPUDevice().setRenderbucketSize(config.getRenderbucketSize());    // Update size
 				}
 				else {
@@ -380,6 +398,19 @@ public class SettingsLoader {
 				
 				// And now update the client configuration with the new value
 				config.setRenderbucketSize(config.getGPUDevice().getRenderbucketSize());
+			}
+		}
+		else if (config.getGPUDevice() != null) {
+			// The order of conditions is important to ensure the priority or app arguments, then the config file and finally the recommended size (if none
+			// specified or already in config file).
+			if (config.getRenderbucketSize() >= GPU.MIN_RENDERBUCKET_SIZE) {
+				config.getGPUDevice().setRenderbucketSize(config.getRenderbucketSize());
+			}
+			else if (renderbucketSize != null) {
+				config.getGPUDevice().setRenderbucketSize(Integer.parseInt(renderbucketSize));
+			}
+			else {
+				config.getGPUDevice().setRenderbucketSize(config.getGPUDevice().getRecommendedBucketSize());
 			}
 		}
 		
@@ -402,20 +433,28 @@ public class SettingsLoader {
 		if (config.getUIType() == null && ui != null) {
 			config.setUIType(ui);
 		}
-
+		
 		if (config.getTheme() == null) {
 			if (this.theme != null) {
 				config.setTheme(this.theme);
-			} else {
+			}
+			else {
 				config.setTheme("light");
 			}
 		}
-
-		config.setAutoSignIn(Boolean.valueOf(autoSignIn));
+		
+		// if the user has invoked the app with --no-systray, then we just overwrite the existing configuration with (boolean)false. If no parameter has been
+		// specified and the settings file contains use-systray=false, then deactivate as well.
+		if (!config.isUseSysTray() || (config.isUseSysTray() && useSysTray != null && useSysTray.equals("false"))) {
+			config.setUseSysTray(false);
+		}
+		
+		config.setAutoSignIn(Boolean.parseBoolean(autoSignIn));
 	}
 	
-	@Override
-	public String toString() {
-		return "SettingsLoader [path=" + path + ", login=" + login + ", password=" + password + ", computeMethod=" + computeMethod + ", gpu=" + gpu + ", renderbucket-size=" + renderbucketSize + ", cacheDir=" + cacheDir + ", theme=" + theme + ", priority=" + priority + "]";
+	@Override public String toString() {
+		return String.format(
+			"SettingsLoader [path=%s, login=%s, password=%s, computeMethod=%s, gpu=%s, renderbucket-size=%s, cacheDir=%s, theme=%s, priority=%d, autosign=%s, usetray=%s]",
+			path, login, password, computeMethod, gpu, renderbucketSize, cacheDir, theme, priority, autoSignIn, useSysTray);
 	}
 }

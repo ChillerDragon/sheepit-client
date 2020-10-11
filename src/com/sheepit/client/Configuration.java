@@ -2,7 +2,7 @@
  * Copyright (C) 2010-2014 Laurent CLOUET
  * Author Laurent CLOUET <laurent.clouet@nopnop.net>
  *
- * This program is free software; you can redistribute it and/or 
+ * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; version 2
  * of the License.
@@ -36,8 +36,7 @@ import com.sheepit.client.hardware.gpu.GPUDevice;
 import com.sheepit.client.os.OS;
 import lombok.Data;
 
-@Data
-public class Configuration {
+@Data public class Configuration {
 	public enum ComputeType {
 		CPU_GPU, CPU, GPU
 	} // accept job for ...
@@ -61,8 +60,11 @@ public class Configuration {
 	private boolean detectGPUs;
 	private boolean printLog;
 	private List<Pair<Calendar, Calendar>> requestTime;
+	private long shutdownTime;
+	private String shutdownMode;
 	private String extras;
 	private boolean autoSignIn;
+	private boolean useSysTray;
 	private String UIType;
 	private String hostname;
 	private String theme;
@@ -89,17 +91,19 @@ public class Configuration {
 		this.setCacheDir(cache_dir_);
 		this.printLog = false;
 		this.requestTime = null;
+		this.shutdownTime = -1;
+		this.shutdownMode = "soft";
 		this.extras = "";
 		this.autoSignIn = false;
+		this.useSysTray = true;
 		this.UIType = null;
 		this.theme = null;
 	}
 	
-	
 	public String toString() {
 		return String.format("Configuration (workingDirectory '%s')", this.workingDirectory.getAbsolutePath());
 	}
-
+	
 	public void setUsePriority(int priority) {
 		if (priority > 19)
 			priority = 19;
@@ -125,7 +129,7 @@ public class Configuration {
 				this.workingDirectory.mkdir();
 				this.workingDirectory.deleteOnExit();
 				
-				// since there is no working directory and the client will be working in the system temp directory, 
+				// since there is no working directory and the client will be working in the system temp directory,
 				// we can also set up a 'permanent' directory for immutable files (like renderer binary)
 				
 				this.storageDirectory = new File(this.workingDirectory.getParent() + File.separator + "sheepit_binary_cache");

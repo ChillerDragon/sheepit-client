@@ -2,7 +2,7 @@
  * Copyright (C) 2010-2014 Laurent CLOUET
  * Author Laurent CLOUET <laurent.clouet@nopnop.net>
  *
- * This program is free software; you can redistribute it and/or 
+ * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; version 2
  * of the License.
@@ -20,6 +20,7 @@ package com.sheepit.client.os;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.IOException;
 import java.util.HashMap;
@@ -32,24 +33,21 @@ import com.sheepit.client.hardware.cpu.CPU;
 
 public class Linux extends OS {
 	private final String NICE_BINARY_PATH = "nice";
-	private Boolean hasNiceBinary;
+	private final String ID_COMMAND_INVOCATION = "id -u";
 	
 	public Linux() {
 		super();
-		this.hasNiceBinary = null;
 	}
 	
 	public String name() {
 		return "linux";
 	}
 	
-	@Override
-	public String getRenderBinaryPath() {
+	@Override public String getRenderBinaryPath() {
 		return "rend.exe";
 	}
 	
-	@Override
-	public CPU getCPU() {
+	@Override public CPU getCPU() {
 		CPU ret = new CPU();
 		try {
 			String filePath = "/proc/cpuinfo";
@@ -89,8 +87,7 @@ public class Linux extends OS {
 		return ret;
 	}
 	
-	@Override
-	public long getMemory() {
+	@Override public long getMemory() {
 		try {
 			String filePath = "/proc/meminfo";
 			Scanner scanner = new Scanner(new File(filePath));
@@ -118,8 +115,7 @@ public class Linux extends OS {
 		return 0;
 	}
 	
-	@Override
-	public long getFreeMemory() {
+	@Override public long getFreeMemory() {
 		try {
 			String filePath = "/proc/meminfo";
 			Scanner scanner = new Scanner(new File(filePath));
@@ -138,7 +134,8 @@ public class Linux extends OS {
 			scanner.close();
 		}
 		catch (java.lang.NoClassDefFoundError e) {
-			System.err.println("OS::Linux::getFreeMemory error " + e + " mostly because Scanner class was introducted by Java 5 and you are running a lower version");
+			System.err.println(
+					"OS::Linux::getFreeMemory error " + e + " mostly because Scanner class was introducted by Java 5 and you are running a lower version");
 		}
 		catch (Exception e) {
 			e.printStackTrace();
@@ -147,20 +144,18 @@ public class Linux extends OS {
 		return 0;
 	}
 	
-	@Override
-	public String getCUDALib() {
+	@Override public String getCUDALib() {
 		return "cuda";
 	}
 	
-	@Override
-	public Process exec(List<String> command, Map<String, String> env_overight) throws IOException {
+	@Override public Process exec(List<String> command, Map<String, String> env_overight) throws IOException {
 		Map<String, String> new_env = new HashMap<String, String>();
 		new_env.putAll(java.lang.System.getenv()); // clone the env
 		
 		// if Blender is already loading an OpenGL library, don't need to load Blender's default one (it will
 		// create system incompatibilities). If no OpenGL library is found, then load the one included in the binary
 		// zip file
-		if (isOpenGLAreadyInstalled(command.get(0)) == false) {
+		if (isOpenGLAlreadyInstalled(command.get(0)) == false) {
 			Boolean has_ld_library_path = new_env.containsKey("LD_LIBRARY_PATH");
 			
 			String lib_dir = (new File(command.get(0))).getParent() + File.separator + "lib";
@@ -173,10 +168,7 @@ public class Linux extends OS {
 		}
 		
 		List<String> actual_command = command;
-		if (this.hasNiceBinary == null) {
-			this.checkNiceAvailability();
-		}
-		if (this.hasNiceBinary.booleanValue()) {
+		if (checkNiceAvailability()) {
 			// launch the process in lowest priority
 			if (env_overight != null) {
 				actual_command.add(0, env_overight.get("PRIORITY"));
@@ -201,30 +193,42 @@ public class Linux extends OS {
 		return builder.start();
 	}
 	
-	@Override
-	public boolean getSupportHighPriority() {
-		// only the root user can create process with high (negative nice) value
-		String logname = System.getenv("LOGNAME");
-		String user = System.getenv("USER");
-		
-		if ((logname != null && logname.equals("root"))	|| (user != null && user.equals("root"))) {
-			return true;
+	@Override public boolean getSupportHighPriority() {
+		try {
+			ProcessBuilder builder = new ProcessBuilder();
+			builder.command("bash", "-c", ID_COMMAND_INVOCATION);
+			builder.redirectErrorStream(true);
+			
+			Process process = builder.start();
+			InputStream is = process.getInputStream();
+			BufferedReader reader = new BufferedReader(new InputStreamReader(is));
+			
+			String userLevel = null;
+			if ((userLevel = reader.readLine()) != null) {
+				// Root user in *ix systems -independently of the alias used to login- has a id value of 0. On top of being a user with root capabilities,
+				// to support changing the priority the nice tool must be accessible from the current user
+				return (userLevel.equals("0")) & checkNiceAvailability();
+			}
+		}
+		catch (IOException e) {
+			System.err.println(String.format("ERROR Linux::getSupportHighPriority Unable to execute id command. IOException %s", e.getMessage()));
 		}
 		
 		return false;
 	}
 	
-	protected void checkNiceAvailability() {
+	@Override public boolean checkNiceAvailability() {
 		ProcessBuilder builder = new ProcessBuilder();
 		builder.command(NICE_BINARY_PATH);
 		builder.redirectErrorStream(true);
+		
 		Process process = null;
+		boolean hasNiceBinary = false;
 		try {
 			process = builder.start();
-			this.hasNiceBinary = true;
+			hasNiceBinary = true;
 		}
 		catch (IOException e) {
-			this.hasNiceBinary = false;
 			Log.getInstance(null).error("Failed to find low priority binary, will not launch renderer in normal priority (" + e + ")");
 		}
 		finally {
@@ -232,9 +236,10 @@ public class Linux extends OS {
 				process.destroy();
 			}
 		}
+		return hasNiceBinary;
 	}
 	
-	protected boolean isOpenGLAreadyInstalled(String pathToRendEXE) {
+	protected boolean isOpenGLAlreadyInstalled(String pathToRendEXE) {
 		ProcessBuilder processBuilder = new ProcessBuilder();
 		processBuilder.command("bash", "-c", "ldd '" + pathToRendEXE + "'");    // support for paths with an space
 		processBuilder.redirectErrorStream(true);
@@ -261,7 +266,7 @@ public class Linux extends OS {
 			
 			int exitCode = process.waitFor();
 			if (exitCode != 0) {
-				System.err.println(String.format("ERROR Linux::isOpenGLAreadyInstalled Unable to execute ldd command. Exit code %d", exitCode));
+				System.err.println(String.format("ERROR Linux::isOpenGLAlreadyInstalled Unable to execute ldd command. Exit code %d", exitCode));
 				System.err.println(String.format("Screen output from ldd execution: %s", screenOutput.toString()));
 			}
 		}
@@ -273,5 +278,16 @@ public class Linux extends OS {
 		}
 		
 		return false;
+	}
+	
+	@Override public void shutdownComputer(int delayInMinutes) {
+		try {
+			// Shutdown the computer waiting 1 minute to allow all SheepIt threads to close and exit the app
+			ProcessBuilder builder = new ProcessBuilder("shutdown", "-h", String.valueOf(delayInMinutes));
+			Process process = builder.inheritIO().start();
+		}
+		catch (IOException e) {
+			System.err.println(String.format("Linux::shutdownComputer Unable to execute the 'shutdown -h 1' command. Exception %s", e.getMessage()));
+		}
 	}
 }

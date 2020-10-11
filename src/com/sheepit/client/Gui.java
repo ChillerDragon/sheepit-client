@@ -2,7 +2,7 @@
  * Copyright (C) 2010-2013 Laurent CLOUET
  * Author Laurent CLOUET <laurent.clouet@nopnop.net>
  *
- * This program is free software; you can redistribute it and/or 
+ * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; version 2
  * of the License.
@@ -27,14 +27,20 @@ public interface Gui {
 	public void status(String msg_);
 	
 	public void status(String msg_, boolean overwriteSuspendedMsg);
-
+	
+	public void status(String msg_, int progress);
+	
+	public void status(String msg_, int progress, long size);
+	
 	public void updateTrayIcon(Integer percentage_);
-
+	
 	public void setRenderingProjectName(String name_);
 	
 	public void setRemainingTime(String time_);
 	
 	public void setRenderingTime(String time_);
+	
+	public void  displayTransferStats(TransferStats downloads, TransferStats uploads);
 	
 	public void displayStats(Stats stats);
 	

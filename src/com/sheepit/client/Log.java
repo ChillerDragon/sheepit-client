@@ -2,7 +2,7 @@
  * Copyright (C) 2011-2014 Laurent CLOUET
  * Author Laurent CLOUET <laurent.clouet@nopnop.net>
  *
- * This program is free software; you can redistribute it and/or 
+ * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; version 2
  * of the License.
@@ -43,25 +43,39 @@ public class Log {
 	}
 	
 	public void debug(String msg_) {
-		this.append("debug", msg_);
+		this.debug(-1, msg_);
+	}
+
+	public void debug(int point_, String msg_) {
+		this.append(point_, "debug", msg_);
 	}
 	
 	public void info(String msg_) {
-		this.append("info", msg_);
+		this.info(-1, msg_);
+	}
+	
+	public void info(int point_, String msg_) {
+		this.append(point_, "info", msg_);
 	}
 	
 	public void error(String msg_) {
-		this.append("error", msg_);
+		this.error(-1, msg_);
+	}
+
+	public void error(int point_, String msg_) {
+		this.append(point_, "error", msg_);
 	}
 	
-	private void append(String level_, String msg_) {
+	private synchronized void append(int point_, String level_, String msg_) {
 		String line = null;
 		
 		try {
+			int checkpointToWrite = (point_ > 0 ? point_ : this.lastCheckPoint);
+			
 			if (msg_.equals("") == false) {
 				line = this.dateFormat.format(new java.util.Date()) + " (" + level_ + ") " + msg_;
-				if (this.checkpoints.containsKey(this.lastCheckPoint) && this.checkpoints.get(this.lastCheckPoint) != null) {
-					this.checkpoints.get(this.lastCheckPoint).add(line);
+				if (this.checkpoints.containsKey(checkpointToWrite) && this.checkpoints.get(checkpointToWrite) != null) {
+					this.checkpoints.get(checkpointToWrite).add(line);
 				}
 				if (this.printStdOut == true) {
 					System.out.println(line);

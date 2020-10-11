@@ -2,7 +2,7 @@
  * Copyright (C) 2010-2014 Laurent CLOUET
  * Author Laurent CLOUET <laurent.clouet@nopnop.net>
  *
- * This program is free software; you can redistribute it and/or 
+ * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; version 2
  * of the License.
@@ -19,13 +19,14 @@
 
 package com.sheepit.client;
 
+import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.URLConnection;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.DigestInputStream;
@@ -51,7 +52,8 @@ import com.sheepit.client.Error.ServerCode;
 import com.sheepit.client.exception.FermeExceptionNoSpaceLeftOnDevice;
 
 public class Utils {
-	public static int unzipFileIntoDirectory(String zipFileName_, String destinationDirectory, String password, Log log) throws FermeExceptionNoSpaceLeftOnDevice {
+	public static int unzipFileIntoDirectory(String zipFileName_, String destinationDirectory, String password, Log log)
+			throws FermeExceptionNoSpaceLeftOnDevice {
 		try {
 			ZipFile zipFile = new ZipFile(zipFileName_);
 			UnzipParameters unzipParameters = new UnzipParameters();
@@ -212,5 +214,38 @@ public class Utils {
 		}
 		
 		return false;
+	}
+
+	public static String findMimeType(String file) throws IOException {
+		String mimeType = Files.probeContentType(Paths.get(file));
+		if (mimeType == null) {
+			InputStream stream = new BufferedInputStream(new FileInputStream(file));
+			mimeType = URLConnection.guessContentTypeFromStream(stream);
+		}
+		if (mimeType == null) {
+			mimeType = URLConnection.guessContentTypeFromName(file);
+		}
+
+		return mimeType;
+	}
+	
+	public static String formatDataConsumption(long bytes) {
+		float divider = 0;
+		String suffix = "";
+		
+		if (bytes > 1099511627776f) {    // 1TB
+			divider = 1099511627776f;
+			suffix = "TB";
+		}
+		else if (bytes > 1073741824) {    // 1GB
+			divider = 1073741824;
+			suffix = "GB";
+		}
+		else {    // 1MB
+			divider = 1048576;
+			suffix = "MB";
+		}
+		
+		return String.format("%.2f%s", (bytes / divider), suffix);
 	}
 }

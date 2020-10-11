@@ -2,7 +2,7 @@
  * Copyright (C) 2013-2014 Laurent CLOUET
  * Author Laurent CLOUET <laurent.clouet@nopnop.net>
  *
- * This program is free software; you can redistribute it and/or 
+ * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; version 2
  * of the License.
@@ -29,6 +29,7 @@ import com.sheepit.client.os.OS;
 import com.sheepit.client.os.Windows;
 
 public class GPU {
+	final public static int MIN_RENDERBUCKET_SIZE = 32;
 	public static List<GPUDevice> devices = null;
 	
 	public static boolean generate() {
